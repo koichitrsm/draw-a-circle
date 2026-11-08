@@ -21,7 +21,7 @@ h1{font-size:clamp(24px,7vw,42px);font-weight:800;letter-spacing:.18em;margin:0;
 <body>
 <div id="app">
 <canvas id="canvas"></canvas>
-<header><h1>DRAW A CIRCLE</h1><div id="sub">DRAW IT. WAKE IT UP.</div></header>
+<header><h1>DRAW A CIRCLE</h1><div id="sub">DRAW IT. GIVE IT LIFE.</div></header>
 <button id="reset">RESET</button>
 <div id="message">指で円を描いてください</div>
 <div id="flash"></div>
@@ -61,53 +61,83 @@ function pathStroke(points,alpha,width,color,close=false){
 }
 function draw(t){
  ctx.clearRect(0,0,W,H);
- // atmospheric grain-like floating motes
  if(mode==='idle'||mode==='drawing'){
   ctx.save();ctx.strokeStyle='rgba(180,210,235,.18)';ctx.lineWidth=1;ctx.setLineDash([2,8]);ctx.beginPath();ctx.arc(W/2,H*.52,Math.min(W,H)*.22,0,Math.PI*2);ctx.stroke();ctx.restore();
  }
  if(mode==='drawing')pathStroke(drawing,1,2.2,'#eaf7ff');
  if(mode==='alive'||mode==='escape'){
   const elapsed=(t-start)/1000;
-  const chaos=mode==='alive'?clamp(elapsed/3.2,0,1):1;
-  const escaping=mode==='escape'?clamp((elapsed-3.2)/1.3,0,1):0;
-  // creature ring pulses and deforms, with points moving like a living worm
+  const aliveTime=mode==='alive'?elapsed:4.7;
+  const chaos=clamp(aliveTime/1.8,0,1);
+  const escaping=mode==='escape'?clamp(elapsed/1.15,0,1):0;
+  // The creature leaps around the screen before escaping.
+  const jumpX = mode==='alive' ? (Math.sin(aliveTime*5.3)+.42*Math.sin(aliveTime*11.7))*Math.min(W*.23,radius*.9)*chaos : 0;
+  const jumpY = mode==='alive' ? (Math.sin(aliveTime*7.1+1.1)+.34*Math.sin(aliveTime*15.3))*Math.min(H*.18,radius*.75)*chaos : 0;
+  const cx=center.x+jumpX, cy=center.y+jumpY;
+  const drift=mode==='escape'?escaping*escaping*Math.max(W,H)*1.55:0;
   const pts=[];
   for(let i=0;i<creature.length;i++){
    const p=creature[i],a=Math.atan2(p.y-center.y,p.x-center.x),base=Math.hypot(p.x-center.x,p.y-center.y);
-   const wave=Math.sin(i*.18+elapsed*7+p.seed)*(.8+chaos*14)+Math.sin(i*.055-elapsed*4)*chaos*10;
-   const radial=base+wave+Math.sin(a*7+elapsed*3)*chaos*8;
-   let x=center.x+Math.cos(a)*radial,y=center.y+Math.sin(a)*radial;
-   if(mode==='escape'){const drift=escaping*escaping* Math.max(W,H)*1.3;x+=escapeVec.x*drift;y+=escapeVec.y*drift;}
+   const wave=Math.sin(i*.19+aliveTime*10+p.seed)*(.8+chaos*radius*.20)
+       +Math.sin(i*.071-aliveTime*6.2)*chaos*radius*.16
+       +Math.sin(i*.035+aliveTime*13)*chaos*radius*.10;
+   // Strong squash/stretch and asymmetrical bulges make the ring read as an animal.
+   const squash=1+.27*Math.sin(aliveTime*5.8)+.18*Math.cos(a*2+aliveTime*4);
+   const radial=(base+wave)*squash+Math.sin(a*5+aliveTime*4.5)*chaos*radius*.18;
+   let x=cx+Math.cos(a)*radial*(1+.2*Math.sin(aliveTime*4.2));
+   let y=cy+Math.sin(a)*radial*(1-.18*Math.sin(aliveTime*4.2));
+   x+=Math.cos(a*2+aliveTime*5)*chaos*radius*.07;
+   y+=Math.sin(a*3-aliveTime*6)*chaos*radius*.08;
+   x+=escapeVec.x*drift;y+=escapeVec.y*drift;
    pts.push({x,y});
   }
   const alpha=1-escaping;
-  // glow under the living line
-  pathStroke(pts,alpha*.24,13,'#56bce9',true);
-  pathStroke(pts,alpha,2.5,'#eafaff',true);
-  pathStroke(pts,alpha*.75,1,'#75d7ff',true);
-  // frantic cage bars appear and shake around the creature
-  if(mode==='alive'){
-   ctx.save();ctx.translate(center.x,center.y);ctx.strokeStyle=`rgba(160,207,235,${.10+chaos*.32})`;ctx.lineWidth=1;
-   for(const b of bars){const a=b.a+Math.sin(elapsed*b.speed+b.offset)*chaos*.18;const r=b.r+Math.sin(elapsed*8+b.offset)*chaos*b.dr;ctx.beginPath();ctx.moveTo(Math.cos(a)*radius*.72,Math.sin(a)*radius*.72);ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r);ctx.stroke();}
-   // cage hoops
-   for(let j=0;j<3;j++){ctx.beginPath();ctx.ellipse(0,0,radius*(1.18+j*.14)+Math.sin(elapsed*7+j)*chaos*8,radius*(1.18+j*.14)*.72,elapsed*.15+j*.5,0,Math.PI*2);ctx.stroke();}
+  pathStroke(pts,alpha*.3,17,'#56bce9',true);
+  pathStroke(pts,alpha,3.2,'#f3fbff',true);
+  pathStroke(pts,alpha*.8,1.1,'#75d7ff',true);
+
+  // Eyes sit on the leading/top side of the creature and follow its movement.
+  const eyeAngle = mode==='escape' ? Math.atan2(escapeVec.y,escapeVec.x) : Math.atan2(Math.cos(aliveTime*5.3)*.5-1,Math.sin(aliveTime*5.3)*.35);
+  const eyeBaseX=cx+escapeVec.x*drift, eyeBaseY=cy+escapeVec.y*drift;
+  const eyeForward=eyeAngle;
+  const eyeSide=eyeForward+Math.PI/2;
+  const eyeDist=radius*.31;
+  const eyeSpread=radius*.18;
+  const eyeR=clamp(radius*.095,5,15);
+  for(let k=-1;k<=1;k+=2){
+   const ex=eyeBaseX+Math.cos(eyeForward)*eyeDist+Math.cos(eyeSide)*eyeSpread*k;
+   const ey=eyeBaseY+Math.sin(eyeForward)*eyeDist+Math.sin(eyeSide)*eyeSpread*k;
+   ctx.save();ctx.globalAlpha=alpha;
+   ctx.shadowColor='rgba(130,220,255,.85)';ctx.shadowBlur=16;
+   ctx.fillStyle='#f8fdff';ctx.beginPath();ctx.ellipse(ex,ey,eyeR*1.08,eyeR*1.28,eyeAngle,0,Math.PI*2);ctx.fill();
+   ctx.shadowBlur=0;ctx.fillStyle='#08121d';ctx.beginPath();ctx.arc(ex+Math.cos(eyeForward)*eyeR*.25,ey+Math.sin(eyeForward)*eyeR*.25,eyeR*.55,0,Math.PI*2);ctx.fill();
+   ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(ex+Math.cos(eyeForward)*eyeR*.42-eyeR*.16,ey+Math.sin(eyeForward)*eyeR*.42-eyeR*.16,eyeR*.16,0,Math.PI*2);ctx.fill();
    ctx.restore();
   }
-  // dust and sparks
-  if(mode==='alive'&&Math.random()<.65){const a=rand(0,Math.PI*2),r=radius*rand(.7,1.8);particles.push({x:center.x+Math.cos(a)*r,y:center.y+Math.sin(a)*r,vx:rand(-1.5,1.5),vy:rand(-1.5,1.5),life:1,size:rand(.5,2)});}
+
+  // Shaky cage / insect-container lines around it.
+  if(mode==='alive'){
+   ctx.save();ctx.translate(cx,cy);ctx.strokeStyle=`rgba(160,207,235,${.10+chaos*.34})`;ctx.lineWidth=1;
+   for(const b of bars){const a=b.a+Math.sin(aliveTime*b.speed*2+b.offset)*chaos*.27;const r=b.r+Math.sin(aliveTime*12+b.offset)*chaos*b.dr;ctx.beginPath();ctx.moveTo(Math.cos(a)*radius*.72,Math.sin(a)*radius*.72);ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r);ctx.stroke();}
+   for(let j=0;j<3;j++){ctx.beginPath();ctx.ellipse(0,0,radius*(1.18+j*.14)+Math.sin(aliveTime*10+j)*chaos*10,radius*(1.18+j*.14)*.72,aliveTime*.25+j*.5,0,Math.PI*2);ctx.stroke();}
+   ctx.restore();
+  }
+  if(mode==='alive'&&Math.random()<.85){const a=rand(0,Math.PI*2),r=radius*rand(.7,1.8);particles.push({x:cx+Math.cos(a)*r,y:cy+Math.sin(a)*r,vx:rand(-2.5,2.5),vy:rand(-2.5,2.5),life:1,size:rand(.5,2.2)});}
   for(const p of particles){ctx.globalAlpha=p.life*alpha*.7;ctx.fillStyle='#b9eaff';ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;
  }
 }
-function animate(t){if(!last)last=t;const dt=Math.min(40,t-last);last=t;const elapsed=(t-start)/1000;
+function animate(t){
+ if(!last)last=t;const dt=Math.min(40,t-last);last=t;const elapsed=(t-start)/1000;
  if(mode==='alive'){
-  for(const p of particles){p.x+=p.vx*dt*.06;p.y+=p.vy*dt*.06;p.life-=dt/1100;}particles=particles.filter(p=>p.life>0);
+  for(const p of particles){p.x+=p.vx*dt*.06;p.y+=p.vy*dt*.06;p.life-=dt/900;}particles=particles.filter(p=>p.life>0);
   draw(t);
-  if(elapsed>3.15){mode='escape';msg.textContent='… IT ESCAPED …';const a=rand(-Math.PI*.8,-Math.PI*.2);escapeVec={x:Math.cos(a),y:Math.sin(a)};start=t;}
+  // Stay in the enclosure longer: fast erratic movement and repeated jumps.
+  if(elapsed>4.7){mode='escape';msg.textContent='… IT ESCAPED …';const a=rand(-Math.PI*.82,-Math.PI*.18);escapeVec={x:Math.cos(a),y:Math.sin(a)};start=t;}
   raf=requestAnimationFrame(animate);
  }else if(mode==='escape'){
-  for(const p of particles){p.x+=p.vx*dt*.06;p.y+=p.vy*dt*.06;p.life-=dt/600;}particles=particles.filter(p=>p.life>0);
+  for(const p of particles){p.x+=p.vx*dt*.06;p.y+=p.vy*dt*.06;p.life-=dt/500;}particles=particles.filter(p=>p.life>0);
   draw(t);
-  if(elapsed>4.5){flash.style.transition='opacity .18s';flash.style.opacity='.85';setTimeout(()=>{flash.style.opacity='0';flash.style.transition='none';reset();},180);}
+  if(elapsed>1.15){flash.style.transition='opacity .18s';flash.style.opacity='.85';setTimeout(()=>{flash.style.opacity='0';flash.style.transition='none';reset();},180);}
   else raf=requestAnimationFrame(animate);
  }
 }
