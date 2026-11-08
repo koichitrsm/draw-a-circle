@@ -9,10 +9,5 @@
 4. 最後に円が画面外へ飛び出して消えます。
 5. `RESET` で最初からやり直せます。
 
-## GitHub Pages
-1. GitHubでPublicリポジトリを作成（例: `draw-a-circle`）。
-2. `index.html` と `manifest.webmanifest` をリポジトリ直下にアップロード。
-3. Settings → Pages → Deploy from a branch → `main` / `/ (root)` → Save。
-4. `https://ユーザー名.github.io/draw-a-circle/` で公開します。
 
 外部ライブラリは使用していません。実機でのiPhone/Android動作確認は未実施です。
