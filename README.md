@@ -1,0 +1,18 @@
+# DRAW A CIRCLE
+
+指で円を描くと、その線が生き物のように波打ち、周囲に檻のような線が現れて暴れ、最後に画面外へ飛び出して消えるミニアプリです。
+
+## 使い方
+1. `index.html` をブラウザで開く、またはGitHub Pagesで公開します。
+2. 画面上で指（PCではマウス）を使って円を描きます。
+3. 円が動き始め、檻のような線が揺れます。
+4. 最後に円が画面外へ飛び出して消えます。
+5. `RESET` で最初からやり直せます。
+
+## GitHub Pages
+1. GitHubでPublicリポジトリを作成（例: `draw-a-circle`）。
+2. `index.html` と `manifest.webmanifest` をリポジトリ直下にアップロード。
+3. Settings → Pages → Deploy from a branch → `main` / `/ (root)` → Save。
+4. `https://ユーザー名.github.io/draw-a-circle/` で公開します。
+
+外部ライブラリは使用していません。実機でのiPhone/Android動作確認は未実施です。

@@ -1,0 +1,8 @@
+{
+  "name": "DRAW A CIRCLE",
+  "short_name": "DRAW A CIRCLE",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#080b10",
+  "theme_color": "#080b10"
+}

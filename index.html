@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#080b10">
+<title>DRAW A CIRCLE</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080b10;color:#f4f5f6;font-family:Arial,Helvetica,sans-serif;touch-action:none}
+#app{position:fixed;inset:0;overflow:hidden;background:radial-gradient(ellipse at 50% 45%,#17212b 0%,#0b1119 52%,#05070a 100%)}
+canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+header{position:absolute;top:calc(env(safe-area-inset-top) + 24px);left:0;right:0;text-align:center;pointer-events:none;z-index:2}
+h1{font-size:clamp(24px,7vw,42px);font-weight:800;letter-spacing:.18em;margin:0;color:#f6f7f8;text-shadow:0 0 22px rgba(170,220,255,.18)}
+#sub{margin-top:10px;font-size:10px;letter-spacing:.28em;color:#8998a7}
+#message{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 30px);left:0;right:0;text-align:center;font-size:10px;letter-spacing:.22em;color:#9ba8b4;pointer-events:none;z-index:2}
+#reset{position:absolute;top:calc(env(safe-area-inset-top) + 20px);right:16px;border:1px solid rgba(210,230,245,.25);background:rgba(5,8,12,.45);color:#aebdca;border-radius:30px;padding:8px 13px;font-size:9px;letter-spacing:.15em;z-index:3}
+#flash{position:absolute;inset:0;background:white;opacity:0;pointer-events:none;z-index:4}
+</style>
+</head>
+<body>
+<div id="app">
+<canvas id="canvas"></canvas>
+<header><h1>DRAW A CIRCLE</h1><div id="sub">DRAW IT. WAKE IT UP.</div></header>
+<button id="reset">RESET</button>
+<div id="message">指で円を描いてください</div>
+<div id="flash"></div>
+</div>
+<script>
+(()=>{
+const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
+const msg=document.getElementById('message'),flash=document.getElementById('flash');
+let W=0,H=0,D=1,mode='idle',drawing=[],creature=[],particles=[],bars=[],start=0,phase=0,last=0,raf=0,center={x:0,y:0},radius=0,escapeVec={x:0,y:-1};
+const rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function resize(){D=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=W*D;canvas.height=H*D;ctx.setTransform(D,0,0,D,0,0);draw(performance.now());}
+addEventListener('resize',resize);
+function pos(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
+function reset(){mode='idle';drawing=[];creature=[];particles=[];bars=[];phase=0;msg.textContent='指で円を描いてください';draw(performance.now());}
+canvas.addEventListener('pointerdown',e=>{if(mode!=='idle')return;e.preventDefault();mode='drawing';drawing=[pos(e)];canvas.setPointerCapture(e.pointerId);msg.textContent='円を閉じてください';});
+canvas.addEventListener('pointermove',e=>{if(mode!=='drawing')return;e.preventDefault();const p=pos(e),q=drawing[drawing.length-1];if(Math.hypot(p.x-q.x,p.y-q.y)>2)drawing.push(p);draw(performance.now());});
+canvas.addEventListener('pointerup',e=>{if(mode!=='drawing')return;const p=pos(e);drawing.push(p);wake();});
+canvas.addEventListener('pointercancel',()=>{if(mode==='drawing')wake();});
+function wake(){
+ if(drawing.length<12){reset();return;}
+ let sx=0,sy=0;for(const p of drawing){sx+=p.x;sy+=p.y;}center={x:sx/drawing.length,y:sy/drawing.length};
+ radius=drawing.reduce((a,p)=>a+Math.hypot(p.x-center.x,p.y-center.y),0)/drawing.length;
+ if(radius<22){reset();return;}
+ // Resample hand-drawn line into evenly spaced creature points
+ const count=180;creature=[];
+ for(let i=0;i<count;i++){const t=i/(count-1)*(drawing.length-1),k=Math.floor(t),f=t-k,a=drawing[k],b=drawing[Math.min(k+1,drawing.length-1)];creature.push({x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f,seed:rand(0,Math.PI*2)});}
+ // Build an irregular cage of bars surrounding the circle
+ bars=[];
+ const n=34;
+ for(let i=0;i<n;i++){const a=i*Math.PI*2/n;const r=radius*rand(1.12,1.5);bars.push({a,r,dr:rand(12,35),speed:rand(.7,1.8),offset:rand(0,6)});}
+ start=performance.now();mode='alive';phase=0;msg.textContent='… IT IS ALIVE …';
+ if(navigator.vibrate)navigator.vibrate([12,20,10]);
+ animate();
+}
+function pathStroke(points,alpha,width,color,close=false){
+ if(!points.length)return;ctx.save();ctx.globalAlpha=alpha;ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();ctx.moveTo(points[0].x,points[0].y);for(let i=1;i<points.length;i++)ctx.lineTo(points[i].x,points[i].y);if(close)ctx.closePath();ctx.stroke();ctx.restore();
+}
+function draw(t){
+ ctx.clearRect(0,0,W,H);
+ // atmospheric grain-like floating motes
+ if(mode==='idle'||mode==='drawing'){
+  ctx.save();ctx.strokeStyle='rgba(180,210,235,.18)';ctx.lineWidth=1;ctx.setLineDash([2,8]);ctx.beginPath();ctx.arc(W/2,H*.52,Math.min(W,H)*.22,0,Math.PI*2);ctx.stroke();ctx.restore();
+ }
+ if(mode==='drawing')pathStroke(drawing,1,2.2,'#eaf7ff');
+ if(mode==='alive'||mode==='escape'){
+  const elapsed=(t-start)/1000;
+  const chaos=mode==='alive'?clamp(elapsed/3.2,0,1):1;
+  const escaping=mode==='escape'?clamp((elapsed-3.2)/1.3,0,1):0;
+  // creature ring pulses and deforms, with points moving like a living worm
+  const pts=[];
+  for(let i=0;i<creature.length;i++){
+   const p=creature[i],a=Math.atan2(p.y-center.y,p.x-center.x),base=Math.hypot(p.x-center.x,p.y-center.y);
+   const wave=Math.sin(i*.18+elapsed*7+p.seed)*(.8+chaos*14)+Math.sin(i*.055-elapsed*4)*chaos*10;
+   const radial=base+wave+Math.sin(a*7+elapsed*3)*chaos*8;
+   let x=center.x+Math.cos(a)*radial,y=center.y+Math.sin(a)*radial;
+   if(mode==='escape'){const drift=escaping*escaping* Math.max(W,H)*1.3;x+=escapeVec.x*drift;y+=escapeVec.y*drift;}
+   pts.push({x,y});
+  }
+  const alpha=1-escaping;
+  // glow under the living line
+  pathStroke(pts,alpha*.24,13,'#56bce9',true);
+  pathStroke(pts,alpha,2.5,'#eafaff',true);
+  pathStroke(pts,alpha*.75,1,'#75d7ff',true);
+  // frantic cage bars appear and shake around the creature
+  if(mode==='alive'){
+   ctx.save();ctx.translate(center.x,center.y);ctx.strokeStyle=`rgba(160,207,235,${.10+chaos*.32})`;ctx.lineWidth=1;
+   for(const b of bars){const a=b.a+Math.sin(elapsed*b.speed+b.offset)*chaos*.18;const r=b.r+Math.sin(elapsed*8+b.offset)*chaos*b.dr;ctx.beginPath();ctx.moveTo(Math.cos(a)*radius*.72,Math.sin(a)*radius*.72);ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r);ctx.stroke();}
+   // cage hoops
+   for(let j=0;j<3;j++){ctx.beginPath();ctx.ellipse(0,0,radius*(1.18+j*.14)+Math.sin(elapsed*7+j)*chaos*8,radius*(1.18+j*.14)*.72,elapsed*.15+j*.5,0,Math.PI*2);ctx.stroke();}
+   ctx.restore();
+  }
+  // dust and sparks
+  if(mode==='alive'&&Math.random()<.65){const a=rand(0,Math.PI*2),r=radius*rand(.7,1.8);particles.push({x:center.x+Math.cos(a)*r,y:center.y+Math.sin(a)*r,vx:rand(-1.5,1.5),vy:rand(-1.5,1.5),life:1,size:rand(.5,2)});}
+  for(const p of particles){ctx.globalAlpha=p.life*alpha*.7;ctx.fillStyle='#b9eaff';ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;
+ }
+}
+function animate(t){if(!last)last=t;const dt=Math.min(40,t-last);last=t;const elapsed=(t-start)/1000;
+ if(mode==='alive'){
+  for(const p of particles){p.x+=p.vx*dt*.06;p.y+=p.vy*dt*.06;p.life-=dt/1100;}particles=particles.filter(p=>p.life>0);
+  draw(t);
+  if(elapsed>3.15){mode='escape';msg.textContent='… IT ESCAPED …';const a=rand(-Math.PI*.8,-Math.PI*.2);escapeVec={x:Math.cos(a),y:Math.sin(a)};start=t;}
+  raf=requestAnimationFrame(animate);
+ }else if(mode==='escape'){
+  for(const p of particles){p.x+=p.vx*dt*.06;p.y+=p.vy*dt*.06;p.life-=dt/600;}particles=particles.filter(p=>p.life>0);
+  draw(t);
+  if(elapsed>4.5){flash.style.transition='opacity .18s';flash.style.opacity='.85';setTimeout(()=>{flash.style.opacity='0';flash.style.transition='none';reset();},180);}
+  else raf=requestAnimationFrame(animate);
+ }
+}
+document.getElementById('reset').addEventListener('click',()=>{cancelAnimationFrame(raf);reset();});
+resize();
+})();
+</script>
+</body>
+</html>
